@@ -15,7 +15,7 @@ set(VITA_TITLEID  "BTHAZARD2")
 set(VITA_MKSFOEX_FLAGS "-d ATTRIBUTE2=12")
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -Wl,-q,--wrap,memcpy,--wrap,memmove,--wrap,memset,--allow-multiple-definition -D_GNU_SOURCE -Wall -O3 -fdiagnostics-color=always -fno-optimize-sibling-calls -mfloat-abi=softfp")
-set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -std=c++11 -Wno-write-strings -fpermissive")
+set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -std=c++11 -Wno-write-strings -fpermissive -fno-rtti")
 
 add_executable(hazard
   loader/main.c
@@ -24,6 +24,7 @@ add_executable(hazard
   loader/sha1.c
   loader/ctype_patch.c
   loader/bass_reimpl.cpp
+  loader/soloud_mp3stream.cpp
 )
 
 target_link_libraries(hazard

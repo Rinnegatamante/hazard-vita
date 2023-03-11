@@ -14,6 +14,7 @@
 #include <mpg123.h>
 #include "soloud.h"
 #include "soloud_wavstream.h"
+#include "soloud_mp3stream.h"
 #include "soloud_wav.h"
 #include "soloud_bus.h"
 #include "bass_reimpl.h"
@@ -22,146 +23,6 @@ SoLoud::Soloud soloud;
 #define min(a, b) (a) < (b) ? (a) : (b)
 
 extern "C" {
-
-typedef struct {
-	uint32_t off_start;
-	uint32_t off_end;
-	void *buf;
-} mp3_buf;
-
-static ssize_t mp3_read(void *io, void *buffer, size_t nbyte) {
-	mp3_buf *mus = (mp3_buf *)io;
-	
-	uint32_t end_read = min((uint32_t)mus->buf + nbyte, mus->off_end);
-	uint32_t read_bytes = end_read - (uint32_t)mus->buf;
-	if (read_bytes) {
-		sceClibMemcpy(buffer, mus->buf, read_bytes);
-		mus->buf += read_bytes;
-	}
-	return read_bytes;
-}
-
-static off_t mp3_seek(void *io, off_t offset, int seek_type) {
-	mp3_buf *mus = (mp3_buf *)io;
-	
-	switch (seek_type) {
-	case SEEK_SET:	
-		mus->buf = mus->off_start + offset;
-		break;
-	case SEEK_CUR:
-		mus->buf += offset;
-		break;
-	case SEEK_END:
-		mus->buf = mus->off_end + offset;
-		break;
-	}
-	return (uint32_t)mus->buf - mus->off_start;
-}
-
-static void mp3_close(void *io) {
-}
-	
-// Taken from https://github.com/libsndfile/libsndfile/blob/master/programs/common.c
-int sfe_copy_data_fp(SNDFILE *outfile, SNDFILE *infile, int channels, int normalize) {
-	static double	data [4096], max ;
-	sf_count_t	 frames, readcount, k ;
-
-	frames = 4096 / channels ;
-	readcount = frames ;
-
-	sf_command (infile, SFC_CALC_SIGNAL_MAX, &max, sizeof (max)) ;
-	if (!isnormal (max)) /* neither zero, subnormal, infinite, nor NaN */
-		return 1 ;
-
-	if (!normalize && max < 1.0)
-	{	
-		while (readcount > 0) {
-			readcount = sf_readf_double (infile, data, frames) ;
-			sf_writef_double (outfile, data, readcount) ;
-		}
-	}
-	else
-	{	
-		sf_command (infile, SFC_SET_NORM_DOUBLE, NULL, SF_FALSE) ;
-		while (readcount > 0) {
-			readcount = sf_readf_double (infile, data, frames) ;
-			for (k = 0 ; k < readcount * channels ; k++) {
-				data [k] /= max ;
-				if (!isfinite (data [k])) /* infinite or NaN */
-					return 1 ;
-			}
-			sf_writef_double (outfile, data, readcount) ;
-		}
-	}
-
-	return 0;
-}
-
-void transpile_to_ogg(void *file, uint32_t length, char *dst_file) {
-	mp3_buf tmp;
-	tmp.buf = file;
-	tmp.off_start = file;
-	tmp.off_end = file + length;
-	mpg123_handle *mp3_handle = mpg123_new(NULL, NULL);
-	mpg123_replace_reader_handle(mp3_handle, mp3_read, mp3_seek, mp3_close);
-	mpg123_open_handle(mp3_handle, &tmp);
-	mpg123_scan(mp3_handle);
-	long srate; int channels, dummy;
-	mpg123_getformat(mp3_handle, &srate, &channels, &dummy);
-	mpg123_format_none(mp3_handle);
-	mpg123_format(mp3_handle, srate, channels, MPG123_ENC_SIGNED_16);
-	printf("File has samplerate %d and %d channels\n", srate, channels);
-		
-	size_t decoded = 0, done = 0;
-	int err;
-	void *out_buf = malloc(100 * 1024 * 1024);
-	void *dst_buf = out_buf;
-	do {
-		err = mpg123_read(mp3_handle, dst_buf, 100 * 1024 * 1024, &done);
-		dst_buf += done;
-		decoded += done;
-	} while (done && err != MPG123_OK);
-	mpg123_close(mp3_handle);
-	mpg123_delete(mp3_handle);
-		
-	FILE *f = fopen("ux0:data/hazard/tmp.wav", "wb");
-	char data[9];
-	uint32_t four = decoded + 36;
-	uint16_t two;
-	strcpy(data, "RIFF");
-	fwrite(data, 1, 4, f);
-	fwrite(&four, 1, 4, f);
-	strcpy(data, "WAVEfmt ");
-	fwrite(data, 1, 8, f);
-	four = 0x10;
-	fwrite(&four, 1, 4, f);
-	two = 0x01;
-	fwrite(&two, 1, 2, f);
-	two = channels;
-	fwrite(&two, 1, 2, f);
-	fwrite(&srate, 1, 4, f);
-	four = srate * channels * 2;
-	fwrite(&four, 1, 4, f);
-	two = channels * 2;
-	fwrite(&two, 1, 2, f);
-	two = 0x10;
-	fwrite(&two, 1, 2, f);
-	strcpy(data, "data");
-	fwrite(data, 1, 4, f);
-	fwrite(&decoded, 1, 4, f);
-	fwrite(out_buf, 1, decoded, f);
-	fclose(f);
-	free(out_buf);
-		
-	SF_INFO sfinfo;
-	SNDFILE *in = sf_open("ux0:data/hazard/tmp.wav", SFM_READ, &sfinfo);
-	sfinfo.format = SF_FORMAT_OGG | SF_FORMAT_VORBIS | SF_ENDIAN_FILE;
-	SNDFILE *out = sf_open(dst_file, SFM_WRITE, &sfinfo);
-	sfe_copy_data_fp(out, in, sfinfo.channels, 0);
-	sf_close(in);
-	sf_close(out);
-	sceIoRemove("ux0:data/hazard/tmp.wav");
-}
 
 const void *BASS_GetConfigPtr(uint32_t option) {
 	return NULL;
@@ -233,25 +94,21 @@ BASS_internal_sample *BASS_StreamCreateFile(uint32_t mem, void *file, uint64_t o
 	//printf("BASS_StreamCreateFile(%x, %x, %llu, %llu, %u)\n", mem, file, offset, length, flags);
 	BASS_internal_sample *res = (BASS_internal_sample *)malloc(sizeof(BASS_internal_sample));
 	res->play_handle = NULL;
-	auto *w = new SoLoud::WavStream;
 	if (mem) {
-		char ogg_name[256];
-		sprintf(ogg_name, "ux0:data/hazard/%d.ogg", length);
-		FILE *f = fopen(ogg_name, "rb");
-		SceIoStat stat;
-		if (sceIoGetstat(ogg_name, &stat) < 0) {
-			transpile_to_ogg(file, length, ogg_name);
-		}
-		w->load(ogg_name);
+		auto *w = new SoLoud::MP3Stream;
+		w->loadMem(file, length, true, false);
+		res->duration = w->getLength();
+		res->handle2 = (void *)w;
 	} else {
+		auto *w = new SoLoud::WavStream;
 		w->load(file);
+		res->duration = w->getLength();
+		res->handle2 = (void *)w;
 	}
 	auto *b = new SoLoud::Bus;
 	b->setVisualizationEnable(true);
 	soloud.play(*b);
 	res->handle = (void *)b;
-	res->duration = w->getLength();
-	res->handle2 = (void *)w;
 	sceClibMemset(&res->info, 0, sizeof(BASS_SAMPLE));
 	res->info.freq = 44100;
 	res->info.volume = 1.0f;

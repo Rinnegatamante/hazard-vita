@@ -100,4 +100,3 @@ cmake .. && make
 - TheFloW for the original .so loader.
 - CatoTheYounger for the screenshots and for testing the homebrew.
 - Northfear for the SDL2 fork with vitaGL as backend.
-- elosota for the work on [Aerofoil](https://github.com/elasota/Aerofoil).
