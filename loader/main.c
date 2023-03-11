@@ -1656,12 +1656,86 @@ int GetArrayLength(void *env, void *array) {
 	}
 }*/
 
+void push_fake_input(int pressed, int button) {
+	SDL_Event e;
+	e.jbutton.which = 0;
+	e.jbutton.button = button;
+	
+	if (pressed) {
+		e.jbutton.type = SDL_JOYBUTTONDOWN;
+		e.jbutton.state = SDL_PRESSED;
+	} else {
+		e.jbutton.type = SDL_JOYBUTTONUP;
+		e.jbutton.state = SDL_RELEASED;
+	}
+	
+	SDL_PushEvent(&e);
+}
+
+void *ctrl_thread(void *argp) {
+	int backTouchState[4] = {0, 0, 0, 0}; // R3 (15), R2 (13), L3 (14), L2 (12)
+	int rear_mapping[4] = {15, 13, 14, 12};
+
+	uint32_t old_buttons = 0, current_buttons = 0, pressed_buttons = 0, released_buttons = 0;
+
+	while (1) {
+		SceTouchData touch;
+
+		int currTouch[4] = {0, 0, 0, 0};
+		sceTouchPeek(SCE_TOUCH_PORT_BACK, &touch, 1);
+		for (int i = 0; i < touch.reportNum; i++) {
+			int x = touch.report[i].x;
+			int y = touch.report[i].y;
+			if (x > 960) {
+				if (y > 544) {
+					if (!backTouchState[0]) {
+						push_fake_input(1, 15);
+						backTouchState[0] = 1;
+					}
+					currTouch[0] = 1;
+				} else {
+					if (!backTouchState[1]) {
+						push_fake_input(1, 13);
+						backTouchState[1] = 1;
+					}
+					currTouch[1] = 1;
+				}
+			} else {
+				if (y > 544) {
+					if (!backTouchState[2]) {
+						push_fake_input(1, 14);
+						backTouchState[2] = 1;
+					}
+					currTouch[2] = 1;
+				} else {
+					if (!backTouchState[3]) {
+						push_fake_input(1, 12);
+						backTouchState[3] = 1;
+					}
+					currTouch[3] = 1;
+				}
+			}
+		}
+		for (int i = 0; i < 4; i++) {
+			if (!currTouch[i] && backTouchState[i]) {
+				backTouchState[i] = 0;
+				push_fake_input(0, rear_mapping[i]);
+			}
+		}
+
+		sceKernelDelayThread(1000);
+	}
+
+	return 0;
+}
+
 int main(int argc, char *argv[]) {
 	//sceSysmoduleLoadModule(SCE_SYSMODULE_RAZOR_CAPTURE);
 	//SceUID crasher_thread = sceKernelCreateThread("crasher", crasher, 0x40, 0x1000, 0, 0, NULL);
 	//sceKernelStartThread(crasher_thread, 0, NULL);	
 	
 	sceTouchSetSamplingState(SCE_TOUCH_PORT_FRONT, SCE_TOUCH_SAMPLING_STATE_START);
+	sceTouchSetSamplingState(SCE_TOUCH_PORT_BACK, SCE_TOUCH_SAMPLING_STATE_START);
 
 	scePowerSetArmClockFrequency(444);
 	scePowerSetBusClockFrequency(222);
@@ -1763,9 +1837,15 @@ int main(int argc, char *argv[]) {
 	*(uintptr_t *)(fake_env + 0x35C) = (uintptr_t)ret0; // RegisterNatives
 	*(uintptr_t *)(fake_env + 0x36C) = (uintptr_t)GetJavaVM;
 	*(uintptr_t *)(fake_env + 0x374) = (uintptr_t)GetStringUTFRegion;
-	
+
 	// Disabling rearpad
 	SDL_setenv("VITA_DISABLE_TOUCH_BACK", "1", 1);
+
+	// Starting thread for backtouch to mimic physical controls
+	pthread_t t;
+	pthread_attr_t attr;
+	pthread_attr_init(&attr);
+	pthread_create(&t, &attr, ctrl_thread, NULL);
 
 	int (*SDL_main)() = (void *) so_symbol(&hazard_mod, "SDL_main");
 	
