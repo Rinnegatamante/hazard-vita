@@ -7,10 +7,6 @@ This is a wrapper/port of <b>Beat Hazard 2</b> for the *PS Vita*.
 The port works by loading the official Android ARMv7 executable in memory, resolving its imports with native functions and patching it in order to properly run.
 By doing so, it's basically as if we emulate a minimalist Android environment in which we run natively the executable as it is.
 
-## Known Issues
-
-- Everytime the game loads a (non custom) song for the first time, game will seem like it's stuck for a few minutes. That's cause transpilation from MPEG to Vorbis codec is performed in real-time.
-
 ## Changelog
 
 ### v1.0

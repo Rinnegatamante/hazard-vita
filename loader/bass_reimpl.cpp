@@ -102,13 +102,13 @@ BASS_internal_sample *BASS_StreamCreateFile(uint32_t mem, void *file, uint64_t o
 	} else {
 		auto *w = new SoLoud::MP3Stream;
 		if (!w->load(file)) {
-			res->duration = w->getLength();
+			res->duration = w->getLength() - 1;
 			res->handle2 = (void *)w;
 		} else {
 			delete w;
 			auto *w = new SoLoud::WavStream;
 			w->load(file);
-			res->duration = w->getLength();
+			res->duration = w->getLength() - 1;
 			res->handle2 = (void *)w;
 		}
 	}
@@ -197,10 +197,12 @@ uint32_t BASS_ChannelPlay(BASS_internal_sample *handle, uint32_t restart) {
 		if (handle->play_handle) {
 			soloud.setPause(handle->play_handle, 0);
 			handle->tick = sceKernelGetProcessTimeWide() - handle->tick;
+			handle->info.freq = handle->info2.freq = soloud.getSamplerate(handle->play_handle);
 		} else {
 			auto *b = (SoLoud::Bus *)handle->handle;
 			handle->play_handle = b->play(*w, handle->info.volume, handle->info.pan);
 			handle->tick = sceKernelGetProcessTimeWide();
+			handle->info.freq = handle->info2.freq = soloud.getSamplerate(handle->play_handle);
 		}
 	}
 	return 1;
@@ -219,9 +221,8 @@ uint32_t BASS_ChannelGetData(BASS_internal_sample *handle, void *buffer, uint32_
 	case BASS_DATA_FFT2048:
 		//printf("GetData BASS_DATA_FFT2048\n");
 		fft = b->calcFFT();
-		sceClibMemcpy(fbuffer, fft, 256 * sizeof(float));
 		for (int i = 0; i < 256; i++) {
-			fbuffer[i] /= 32.0f;
+			fbuffer[i] = fft[i] / 32.0f; // FIXME: Without this normalization, FFT is way higher than expected
 		}
 		sceClibMemcpy(fbuffer + 256, fbuffer, 256 * sizeof(float));
 		//sceClibMemset(fbuffer + 256, 0, 256 * sizeof(float));
@@ -285,7 +286,7 @@ int BASS_ChannelPause(BASS_internal_sample *handle) {
 int Song_GetTotalDuration(const char *file) {
 	SoLoud::WavStream m;
 	m.load(file);
-	return m.getLength();
+	return m.getLength() - 1;
 }
 
 };
