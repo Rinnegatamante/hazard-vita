@@ -1513,7 +1513,9 @@ void populateSongs(const char *dir, const char *album) {
 			sprintf(fname, "%s/%s", dir, g_dir.d_name);
 			populateSongs(fname, g_dir.d_name);
 		} else {
-			if (!strcmp(&g_dir.d_name[strlen(g_dir.d_name) - 4], ".ogg") || !strcmp(&g_dir.d_name[strlen(g_dir.d_name) - 4], ".wav")) {
+			if (!strcmp(&g_dir.d_name[strlen(g_dir.d_name) - 4], ".ogg") ||
+				!strcmp(&g_dir.d_name[strlen(g_dir.d_name) - 4], ".wav") ||
+				!strcmp(&g_dir.d_name[strlen(g_dir.d_name) - 4], ".mp3")) {
 				song *s = &songs[song_idx++];
 				sceClibMemset(s, 0, sizeof(song));
 				sprintf(s->fname, "%s/%s", dir, g_dir.d_name);
@@ -1541,7 +1543,9 @@ int countSongs(const char *dir, int master) {
 			sprintf(fname, "%s/%s", dir, g_dir.d_name);
 			res += countSongs(fname, 0);
 		} else {
-			if (!strcmp(&g_dir.d_name[strlen(g_dir.d_name) - 4], ".ogg") || !strcmp(&g_dir.d_name[strlen(g_dir.d_name) - 4], ".wav")) {
+			if (!strcmp(&g_dir.d_name[strlen(g_dir.d_name) - 4], ".ogg") ||
+				!strcmp(&g_dir.d_name[strlen(g_dir.d_name) - 4], ".wav") ||
+				!strcmp(&g_dir.d_name[strlen(g_dir.d_name) - 4], ".mp3")) {
 				res++;
 			}
 		}

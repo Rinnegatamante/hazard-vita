@@ -100,10 +100,17 @@ BASS_internal_sample *BASS_StreamCreateFile(uint32_t mem, void *file, uint64_t o
 		res->duration = w->getLength();
 		res->handle2 = (void *)w;
 	} else {
-		auto *w = new SoLoud::WavStream;
-		w->load(file);
-		res->duration = w->getLength();
-		res->handle2 = (void *)w;
+		auto *w = new SoLoud::MP3Stream;
+		if (!w->load(file)) {
+			res->duration = w->getLength();
+			res->handle2 = (void *)w;
+		} else {
+			delete w;
+			auto *w = new SoLoud::WavStream;
+			w->load(file);
+			res->duration = w->getLength();
+			res->handle2 = (void *)w;
+		}
 	}
 	auto *b = new SoLoud::Bus;
 	b->setVisualizationEnable(true);
