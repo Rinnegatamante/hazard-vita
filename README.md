@@ -96,3 +96,4 @@ cmake .. && make
 - TheFloW for the original .so loader.
 - CatoTheYounger for the screenshots and for testing the homebrew.
 - Northfear for the SDL2 fork with vitaGL as backend.
+- Once13one for the Livearea assets.
