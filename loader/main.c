@@ -718,6 +718,10 @@ void SDL_GetVersion_fake(SDL_version *ver){
 	ver->patch = 10;
 }
 
+const char *SDL_JoystickName_fake(SDL_Joystick *joystick) {
+	return "PS4 Controller";
+}
+
 static so_default_dynlib default_dynlib[] = {
 	{ "glShaderSource", (uintptr_t)&glShaderSource_fake},
 	{ "glGetUniformLocation", (uintptr_t)&glGetUniformLocation_fake},
@@ -1311,7 +1315,7 @@ static so_default_dynlib default_dynlib[] = {
 	{ "SDL_JoystickGetGUIDString", (uintptr_t)&SDL_JoystickGetGUIDString },
 	{ "SDL_JoystickNumHats", (uintptr_t)&SDL_JoystickNumHats },
 	{ "SDL_JoystickNumBalls", (uintptr_t)&SDL_JoystickNumBalls },
-	{ "SDL_JoystickName", (uintptr_t)&SDL_JoystickName },
+	{ "SDL_JoystickName", (uintptr_t)&SDL_JoystickName_fake },
 	{ "SDL_GetNumRenderDrivers", (uintptr_t)&SDL_GetNumRenderDrivers },
 	{ "SDL_GetRenderDriverInfo", (uintptr_t)&SDL_GetRenderDriverInfo },
 	{ "SDL_GetNumVideoDrivers", (uintptr_t)&SDL_GetNumVideoDrivers },
