@@ -422,6 +422,10 @@ int showWebPage(void *this, char *url) {
 }
 
 void patch_game(void) {
+	char *androidProvider = (char *)so_symbol(&hazard_mod, "androidProvider");
+	if (androidProvider)
+		sprintf(androidProvider, "%s - PSVita v.1.0", androidProvider);
+	
 	hook_addr(so_symbol(&hazard_mod, "_ZN16CplatformAndroid16misc_showWebPageEPc"), (uintptr_t)&showWebPage);
 	
 	hook_addr(so_symbol(&hazard_mod, "_ZN15CachievementMgr20checkAllAchievementsEv"), (uintptr_t)&ret0); // Stack smashes
@@ -1528,6 +1532,7 @@ void populateSongs(const char *dir, const char *album) {
 		} else {
 			if (!strcmp(&g_dir.d_name[strlen(g_dir.d_name) - 4], ".ogg") ||
 				!strcmp(&g_dir.d_name[strlen(g_dir.d_name) - 4], ".wav") ||
+				!strcmp(&g_dir.d_name[strlen(g_dir.d_name) - 5], ".flac") ||
 				!strcmp(&g_dir.d_name[strlen(g_dir.d_name) - 4], ".mp3")) {
 				song *s = &songs[song_idx++];
 				sceClibMemset(s, 0, sizeof(song));
@@ -1558,6 +1563,7 @@ int countSongs(const char *dir, int master) {
 		} else {
 			if (!strcmp(&g_dir.d_name[strlen(g_dir.d_name) - 4], ".ogg") ||
 				!strcmp(&g_dir.d_name[strlen(g_dir.d_name) - 4], ".wav") ||
+				!strcmp(&g_dir.d_name[strlen(g_dir.d_name) - 5], ".flac") ||
 				!strcmp(&g_dir.d_name[strlen(g_dir.d_name) - 4], ".mp3")) {
 				res++;
 			}
@@ -1659,16 +1665,6 @@ int GetArrayLength(void *env, void *array) {
 	return *(int *)array;
 }
 
-/*int crasher(unsigned int argc, void *argv) {
-	uint32_t *nullptr = NULL;
-	for (;;) {
-		SceCtrlData pad;
-		sceCtrlPeekBufferPositive(0, &pad, 1);
-		if (pad.buttons & SCE_CTRL_SELECT) *nullptr = 0;
-		sceKernelDelayThread(100);
-	}
-}*/
-
 void push_fake_input(int pressed, int button) {
 	SDL_Event e;
 	e.jbutton.which = 0;
@@ -1741,6 +1737,16 @@ void *ctrl_thread(void *argp) {
 
 	return 0;
 }
+
+/*int crasher(unsigned int argc, void *argv) {
+	uint32_t *nullptr = NULL;
+	for (;;) {
+		SceCtrlData pad;
+		sceCtrlPeekBufferPositive(0, &pad, 1);
+		if (pad.buttons & SCE_CTRL_SELECT) *nullptr = 0;
+		sceKernelDelayThread(100);
+	}
+}*/
 
 int main(int argc, char *argv[]) {
 	//sceSysmoduleLoadModule(SCE_SYSMODULE_RAZOR_CAPTURE);

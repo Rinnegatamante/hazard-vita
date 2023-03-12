@@ -13,7 +13,6 @@
 #include <sndfile.h>
 #include "soloud.h"
 #include "soloud_wavstream.h"
-#include "soloud_mp3stream.h"
 #include "soloud_wav.h"
 #include "soloud_bus.h"
 #include "bass_reimpl.h"
@@ -93,22 +92,18 @@ BASS_internal_sample *BASS_StreamCreateFile(uint32_t mem, void *file, uint64_t o
 	BASS_internal_sample *res = (BASS_internal_sample *)malloc(sizeof(BASS_internal_sample));
 	res->play_handle = NULL;
 	if (mem) {
-		auto *w = new SoLoud::MP3Stream;
+		auto *w = new SoLoud::WavStream;
 		w->loadMem(file, length, false, false);
 		res->duration = w->getLength();
 		res->handle2 = (void *)w;
 	} else {
-		auto *w = new SoLoud::MP3Stream;
-		if (!w->load(file)) {
-			res->duration = w->getLength() - 1;
-			res->handle2 = (void *)w;
-		} else {
-			delete w;
-			auto *w = new SoLoud::WavStream;
-			w->load(file);
-			res->duration = w->getLength() - 1;
-			res->handle2 = (void *)w;
+		auto *w = new SoLoud::WavStream;
+		int r = w->load(file);
+		if (r) {
+			printf("Error while opening %s (0x%x)\n", file, r);
 		}
+		res->duration = w->getLength() - 1;
+		res->handle2 = (void *)w;
 	}
 	auto *b = new SoLoud::Bus;
 	b->setVisualizationEnable(true);
@@ -242,13 +237,8 @@ uint32_t BASS_ChannelGetLength(BASS_internal_sample *handle, uint32_t mode) {
 }
 
 double BASS_ChannelBytes2Seconds(BASS_internal_sample *handle, uint64_t pos) {
-	if (!handle->handle2) {
-		//printf("Byte2Seconds %x %llu\n", handle->handle, pos);
-		return pos == handle->info.length ? handle->duration : min((float)(sceKernelGetProcessTimeWide() - handle->tick) / 1000000.0f, handle->duration);
-	} else {
-		//printf("Byte2Seconds %x %llu\n", handle->handle, pos);
-		return pos == handle->info.length ? handle->duration : min((float)(sceKernelGetProcessTimeWide() - handle->tick) / 1000000.0f, handle->duration);
-	}
+	//printf("Byte2Seconds %x %llu\n", handle->handle, pos);
+	return pos == handle->info.length ? handle->duration : min((float)(sceKernelGetProcessTimeWide() - handle->tick) / 1000000.0f, handle->duration);
 }
 
 uint64_t BASS_ChannelGetPosition(BASS_internal_sample *handle, uint32_t mode) {
@@ -282,12 +272,8 @@ int BASS_ChannelPause(BASS_internal_sample *handle) {
 }
 
 int Song_GetTotalDuration(const char *file) {
-	SoLoud::MP3Stream m;
-	if (m.load(file)) {
-		SoLoud::WavStream m;
-		m.load(file);
-		return m.getLength() - 1;
-	}
+	SoLoud::WavStream m;
+	m.load(file);
 	return m.getLength() - 1;
 }
 

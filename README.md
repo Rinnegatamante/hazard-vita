@@ -34,7 +34,7 @@ By doing so, it's basically as if we emulate a minimalist Android environment in
 
 ## How to use custom songs
 
-Beat Hazard 2 features support for custom songs. On the Vita port, songs in `.wav`, `.mp3` and `.ogg` formats are supported.
+Beat Hazard 2 features support for custom songs. On the Vita port, songs in `.wav`, `.mp3`, `.flac` and `.ogg` formats are supported.
 
 Songs must be placed in `ux0:data/hazard/songs` and an additional metadata file can be added named as `filename_of_the_song.format.txt`. In this file, two parameters can be written:
 ```

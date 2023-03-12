@@ -24,7 +24,6 @@ add_executable(hazard
   loader/sha1.c
   loader/ctype_patch.c
   loader/bass_reimpl.cpp
-  loader/soloud_mp3stream.cpp
 )
 
 target_link_libraries(hazard
@@ -34,7 +33,7 @@ target_link_libraries(hazard
   SDL2_ttf
   SDL2_net
   freetype
-  soloud
+  soloud_static
   SDL2
   png
   webp
