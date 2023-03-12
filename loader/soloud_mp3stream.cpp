@@ -89,7 +89,7 @@ namespace SoLoud
 		unsigned int offset = 0;
 		float tmp[512 * MAX_CHANNELS];
 		if (mFile == NULL)
-			return 0;
+			return;
 
 				unsigned int i, j, k;
 

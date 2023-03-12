@@ -11,7 +11,6 @@
 #include <string.h>
 #include <unistd.h>
 #include <sndfile.h>
-#include <mpg123.h>
 #include "soloud.h"
 #include "soloud_wavstream.h"
 #include "soloud_mp3stream.h"
@@ -34,7 +33,6 @@ uint32_t BASS_GetVersion() {
 
 int BASS_Init(int device, uint32_t freq, uint32_t flags, int win, void *clsid) {
 	soloud.init(SoLoud::Soloud::CLIP_ROUNDOFF);
-	mpg123_init();
 	return 1;
 }
 
@@ -96,7 +94,7 @@ BASS_internal_sample *BASS_StreamCreateFile(uint32_t mem, void *file, uint64_t o
 	res->play_handle = NULL;
 	if (mem) {
 		auto *w = new SoLoud::MP3Stream;
-		w->loadMem(file, length, true, false);
+		w->loadMem(file, length, false, false);
 		res->duration = w->getLength();
 		res->handle2 = (void *)w;
 	} else {
@@ -259,19 +257,19 @@ uint64_t BASS_ChannelGetPosition(BASS_internal_sample *handle, uint32_t mode) {
 	return 1;
 }
 
-uint32_t BASS_ChannelStop(BASS_internal_sample *handle) {
-	if (!handle->handle2) {
-		soloud.stop(handle->play_handle);
-		auto *w = (SoLoud::WavStream *)handle->handle2;
+uint32_t BASS_ChannelStop(BASS_internal_sample *h) {
+	if (!h->handle2) {
+		soloud.stop(h->play_handle);
+		auto *w = (SoLoud::Wav *)h->handle;
 		delete w;
-		free(handle);
+		free(h);
 	} else {
-		auto *b = (SoLoud::Bus *)handle->handle;
-		auto *w = (SoLoud::WavStream *)handle->handle2;
+		auto *b = (SoLoud::Bus *)h->handle;
+		auto *w = (SoLoud::WavStream *)h->handle2;
 		b->stop();
 		delete b;
 		delete w;
-		free(handle);
+		free(h);
 	}
 	return 1;
 }
@@ -284,8 +282,12 @@ int BASS_ChannelPause(BASS_internal_sample *handle) {
 }
 
 int Song_GetTotalDuration(const char *file) {
-	SoLoud::WavStream m;
-	m.load(file);
+	SoLoud::MP3Stream m;
+	if (m.load(file)) {
+		SoLoud::WavStream m;
+		m.load(file);
+		return m.getLength() - 1;
+	}
 	return m.getLength() - 1;
 }
 

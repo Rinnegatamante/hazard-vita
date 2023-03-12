@@ -138,6 +138,13 @@ extern "C" {
 #define BASS_CTYPE_MUSIC_IT		0x20004
 #define BASS_CTYPE_MUSIC_MO3	0x00100
 
+#define BASS_STREAM_PRESCAN		0x20000 // scan file for accurate seeking and length
+#define BASS_STREAM_AUTOFREE	0x40000	// automatically free the stream when it stops/ends
+#define BASS_STREAM_RESTRATE	0x80000	// restrict the download rate of internet file stream
+#define BASS_STREAM_BLOCK		0x100000 // download internet file stream in small blocks
+#define BASS_STREAM_DECODE		0x200000 // don't play the stream, only decode
+#define BASS_STREAM_STATUS		0x800000 // give server status info (HTTP/ICY tags) in DOWNLOADPROC
+
 typedef struct {
 	uint32_t freq;
 	float volume;
