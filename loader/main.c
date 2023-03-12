@@ -412,9 +412,18 @@ int debugMsg(int a1, int a2, const char *fmt, ...) {
 	printf("[DMSG] %s\n", string);
 }
 
-so_hook btn_hook, btn_hook2;
+int showWebPage(void *this, char *url) {
+	SceAppUtilWebBrowserParam param = {0};
+	param.str = url;
+	param.strlen = strlen(url);
+	param.launchMode = 1;
+	sceAppUtilLaunchWebBrowser(&param);
+	return 0;
+}
 
 void patch_game(void) {
+	hook_addr(so_symbol(&hazard_mod, "_ZN16CplatformAndroid16misc_showWebPageEPc"), (uintptr_t)&showWebPage);
+	
 	hook_addr(so_symbol(&hazard_mod, "_ZN15CachievementMgr20checkAllAchievementsEv"), (uintptr_t)&ret0); // Stack smashes
 
 	//hook_addr(so_symbol(&hazard_mod, "_ZN9CdebugMsg7printffE9EdebugMsgPKcz"), (uintptr_t)&debugMsg);
@@ -1733,6 +1742,10 @@ int main(int argc, char *argv[]) {
 	//sceSysmoduleLoadModule(SCE_SYSMODULE_RAZOR_CAPTURE);
 	//SceUID crasher_thread = sceKernelCreateThread("crasher", crasher, 0x40, 0x1000, 0, 0, NULL);
 	//sceKernelStartThread(crasher_thread, 0, NULL);	
+	
+	SceAppUtilInitParam init_param = {0};
+	SceAppUtilBootParam boot_param = {0};
+	sceAppUtilInit(&init_param, &boot_param);
 	
 	sceTouchSetSamplingState(SCE_TOUCH_PORT_FRONT, SCE_TOUCH_SAMPLING_STATE_START);
 	sceTouchSetSamplingState(SCE_TOUCH_PORT_BACK, SCE_TOUCH_SAMPLING_STATE_START);
