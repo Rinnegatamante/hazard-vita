@@ -62,6 +62,8 @@ static char data_path[256];
 static char fake_vm[0x1000];
 static char fake_env[0x1000];
 
+int framecap = 0;
+
 int file_exists(const char *path) {
 	SceIoStat stat;
 	return sceIoGetstat(path, &stat) >= 0;
@@ -723,10 +725,16 @@ void SDL_GetVersion_fake(SDL_version *ver){
 }
 
 const char *SDL_JoystickName_fake(SDL_Joystick *joystick) {
-	return "PS4 Controller";
+	return "Totally PS4 Controller ( ͡° ͜ʖ ͡°)";
+}
+
+char *glGetString_fake(GLenum cap) {
+	eglSwapInterval(0, framecap ? 2 : 1);
+	return glGetString(cap);
 }
 
 static so_default_dynlib default_dynlib[] = {
+	{ "glGetString", (uintptr_t)&glGetString_fake},
 	{ "glShaderSource", (uintptr_t)&glShaderSource_fake},
 	{ "glGetUniformLocation", (uintptr_t)&glGetUniformLocation_fake},
 	{ "BASS_GetConfigPtr", (uintptr_t)&BASS_GetConfigPtr},
@@ -1756,6 +1764,15 @@ int main(int argc, char *argv[]) {
 	SceAppUtilInitParam init_param = {0};
 	SceAppUtilBootParam boot_param = {0};
 	sceAppUtilInit(&init_param, &boot_param);
+	SceAppUtilAppEventParam eventParam;
+	sceClibMemset(&eventParam, 0, sizeof(SceAppUtilAppEventParam));
+	sceAppUtilReceiveAppEvent(&eventParam);
+	if (eventParam.type == 0x05) {
+		char buffer[2048];
+		sceAppUtilAppEventParseLiveArea(&eventParam, buffer);
+		if (strstr(buffer, "custom"))
+			framecap = 1;
+	}
 	
 	sceTouchSetSamplingState(SCE_TOUCH_PORT_FRONT, SCE_TOUCH_SAMPLING_STATE_START);
 	sceTouchSetSamplingState(SCE_TOUCH_PORT_BACK, SCE_TOUCH_SAMPLING_STATE_START);
