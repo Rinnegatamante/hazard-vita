@@ -44,10 +44,13 @@ target_link_libraries(hazard
   stdc++
   opensles
   sndfile
+  vorbisfile
   vorbis
   vorbisenc
-  vorbisfile
   ogg
+  opusfile
+  opus
+  modplug
   FLAC
   openal
   imgui
@@ -91,5 +94,4 @@ vita_create_vpk(hazard.vpk ${VITA_TITLEID} eboot.bin
        ${CMAKE_SOURCE_DIR}/livearea/beat.png sce_sys/livearea/contents/beat.png
        ${CMAKE_SOURCE_DIR}/livearea/conf.png sce_sys/livearea/contents/conf.png
        ${CMAKE_SOURCE_DIR}/livearea/template.xml sce_sys/livearea/contents/template.xml
-       ${CMAKE_SOURCE_DIR}/shaders shaders
 )
