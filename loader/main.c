@@ -426,7 +426,7 @@ int showWebPage(void *this, char *url) {
 void patch_game(void) {
 	char *androidProvider = (char *)so_symbol(&hazard_mod, "androidProvider");
 	if (androidProvider)
-		sprintf(androidProvider, "%s - PSVita v.1.0", androidProvider);
+		sprintf(androidProvider, "%s - PSVita v.1.1", androidProvider);
 	
 	hook_addr(so_symbol(&hazard_mod, "_ZN16CplatformAndroid16misc_showWebPageEPc"), (uintptr_t)&showWebPage);
 	
@@ -1462,6 +1462,11 @@ int CallBooleanMethodV(void *env, void *obj, int methodID, uintptr_t *args) {
 	}
 }
 
+enum {
+	DATA_SONGS,
+	IMPORTED_SONGS
+};
+
 typedef struct {
 	char title[128];
 	char artist[128];
@@ -1471,8 +1476,9 @@ typedef struct {
 	void *next;
 } song;
 song *songs = NULL;
-uint8_t songs_scanned = 0;
+uint8_t songs_scanned[2] = {0, 0};
 int song_idx = 0;
+int songs_num = 0;
 
 void load_metadata(const char *fname, song *s) {
 	char buffer[256];
@@ -1499,14 +1505,14 @@ void load_metadata(const char *fname, song *s) {
 		sprintf(s->artist, "Unknown");
 }
 
-void populateSongs(const char *dir, const char *album) {
+void populateSongs(const char *dir, const char *album, int id) {
 	SceUID fd = sceIoDopen(dir);
 	SceIoDirent g_dir;
 	char fname[256];
 	while (sceIoDread(fd, &g_dir) > 0) {
 		if (SCE_S_ISDIR(g_dir.d_stat.st_mode)) {
 			sprintf(fname, "%s/%s", dir, g_dir.d_name);
-			populateSongs(fname, g_dir.d_name);
+			populateSongs(fname, g_dir.d_name, id);
 		} else {
 			if (!strcmp(&g_dir.d_name[strlen(g_dir.d_name) - 4], ".ogg") ||
 				!strcmp(&g_dir.d_name[strlen(g_dir.d_name) - 4], ".wav") ||
@@ -1522,14 +1528,18 @@ void populateSongs(const char *dir, const char *album) {
 					sprintf(s->title, g_dir.d_name);
 					s->title[strlen(s->title) - 4] = 0;
 				}
-				strcpy(s->album, album ? album : "Unknown");
+				if (id == IMPORTED_SONGS) {
+					strcpy(s->album, "Imported Music");
+				} else {
+					strcpy(s->album, album ? album : "Unknown");
+				}
 			}
 		}
 	}
 	sceIoDclose(fd);
 }
 
-int countSongs(const char *dir, int master) {
+int countSongs(const char *dir, int master, int id) {
 	int res = 0;
 	SceUID fd = sceIoDopen(dir);
 	SceIoDirent g_dir;
@@ -1537,7 +1547,7 @@ int countSongs(const char *dir, int master) {
 		if (SCE_S_ISDIR(g_dir.d_stat.st_mode)) {
 			char fname[256];
 			sprintf(fname, "%s/%s", dir, g_dir.d_name);
-			res += countSongs(fname, 0);
+			res += countSongs(fname, 0, id);
 		} else {
 			if (!strcmp(&g_dir.d_name[strlen(g_dir.d_name) - 4], ".ogg") ||
 				!strcmp(&g_dir.d_name[strlen(g_dir.d_name) - 4], ".wav") ||
@@ -1548,10 +1558,14 @@ int countSongs(const char *dir, int master) {
 		}
 	}
 	sceIoDclose(fd);
-	if (!songs_scanned && master) {
-		songs = (song *)malloc(sizeof(song) * res);
-		populateSongs(dir, NULL);
-		songs_scanned = 1;
+	if (!songs_scanned[id] && master) {
+		if (songs) {
+			songs = (song *)realloc(songs, sizeof(song) * (res + songs_num));
+		} else {
+			songs = (song *)malloc(sizeof(song) * res);
+		}
+		populateSongs(dir, NULL, id);
+		songs_scanned[id] = 1;
 	}
 	return res;
 }
@@ -1586,7 +1600,11 @@ void *CallObjectMethodV(void *env, void *obj, int methodID, uintptr_t *args) {
 int CallIntMethodV(void *env, void *obj, int methodID, uintptr_t *args) {
 	switch (methodID) {
 	case MUSIC_GET_NUM_TRACKS:
-		return countSongs("ux0:data/hazard/songs", 1);
+		if (!songs_num) {
+			songs_num += countSongs("ux0:data/hazard/songs", 1, DATA_SONGS);
+			songs_num += countSongs("ux0:music", 1, IMPORTED_SONGS);
+		}
+		return songs_num;
 	default:
 		return 0;
 	}
@@ -1743,6 +1761,7 @@ int main(int argc, char *argv[]) {
 		if (strstr(buffer, "custom"))
 			framecap = 1;
 	}
+	sceAppUtilMusicMount();
 	
 	sceTouchSetSamplingState(SCE_TOUCH_PORT_FRONT, SCE_TOUCH_SAMPLING_STATE_START);
 	sceTouchSetSamplingState(SCE_TOUCH_PORT_BACK, SCE_TOUCH_SAMPLING_STATE_START);
