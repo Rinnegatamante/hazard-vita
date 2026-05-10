@@ -1519,6 +1519,14 @@ void load_metadata(const char *fname, song *s) {
 				strcpy(s->artist, buffer);
 				if (s->artist[strlen(s->artist) - 1] == '\r' || s->artist[strlen(s->artist) - 1] == '\n')
 					s->artist[strlen(s->artist) - 1] = 0;
+			} else if (strcmp("genre", identifier) == 0) {
+				strcpy(s->genre, buffer);
+				if (s->genre[strlen(s->genre) - 1] == '\r' || s->genre[strlen(s->genre) - 1] == '\n')
+					s->genre[strlen(s->genre) - 1] = 0;
+			} else if (strcmp("album", identifier) == 0) {
+				strcpy(s->album, buffer);
+				if (s->album[strlen(s->album) - 1] == '\r' || s->album[strlen(s->album) - 1] == '\n')
+					s->album[strlen(s->album) - 1] = 0;
 			}
 		}
 		fclose(config);
@@ -1545,6 +1553,8 @@ void populateSongs(const char *dir, const char *album, int id) {
 				song *s = &songs[song_idx++];
 				s->title[0] = s->artist[0] = s->album[0] = s->genre[0] = 0;
 				sprintf(s->fname, "%s/%s", dir, g_dir.d_name);
+				
+				// Metadata extraction
 				int found_tags = 0;
 				if (g_dir.d_name[len - 1] == '3') { // MP3
 					FILE *f = fopen(s->fname, "rb");
@@ -1680,6 +1690,8 @@ void populateSongs(const char *dir, const char *album, int id) {
 							fseek(f, block_len, SEEK_CUR);
 						}
 					}
+				} else if (g_dir.d_name[len - 1] == 'v') { // WAV
+					
 				}
 				s->duration = Song_GetTotalDuration(s->fname) * 1000;
 				sprintf(fname, "%s/%s.txt", dir, g_dir.d_name);
