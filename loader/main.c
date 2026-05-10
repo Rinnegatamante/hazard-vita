@@ -524,38 +524,8 @@ int chdir_hook(const char *path) {
 	return 0;
 }
 
-GLint glGetUniformLocation_fake(GLuint program, const GLchar *name) {
-	if (!strcmp(name, "texture"))
-		return glGetUniformLocation(program, "_texture");
-	return glGetUniformLocation(program, name);
-}
-
-void glShaderSource_fake(GLuint shader, GLsizei count, const GLchar **string, const GLint *length) {
-	static int idx = 0;
-	char fname[256];
-	sprintf(fname, "app0:shaders/%d.glsl", idx++);
-	FILE *f = fopen(fname, "rb");
-	if (!f) {
-		f = fopen(fname, "wb");
-		fwrite(*string, 1, strlen(*string), f);
-		fclose(f);
-		sprintf(fname, "ux0:data/hazard/%d.glsl", (idx - 1) % 2);
-		f = fopen(fname, "rb");
-	}
-	fseek(f, 0, SEEK_END);
-	GLint len = ftell(f);
-	fseek(f, 0, SEEK_SET);
-	char *shd_src = (char *)malloc(len + 1);
-	fread(shd_src, 1, len, f);
-	fclose(f);
-	shd_src[len] = 0;
-	glShaderSource(shader, 1, &shd_src, NULL);
-	free(shd_src);
-}
-
 static so_default_dynlib gl_hook[] = {
 	{"glPixelStorei", (uintptr_t)&ret0},
-	{"glShaderSource", (uintptr_t)&glShaderSource_fake},
 };
 static size_t gl_numhook = sizeof(gl_hook) / sizeof(*gl_hook);
 
@@ -735,8 +705,8 @@ char *glGetString_fake(GLenum cap) {
 
 static so_default_dynlib default_dynlib[] = {
 	{ "glGetString", (uintptr_t)&glGetString_fake},
-	{ "glShaderSource", (uintptr_t)&glShaderSource_fake},
-	{ "glGetUniformLocation", (uintptr_t)&glGetUniformLocation_fake},
+	{ "glShaderSource", (uintptr_t)&glShaderSource},
+	{ "glGetUniformLocation", (uintptr_t)&glGetUniformLocation},
 	{ "BASS_GetConfigPtr", (uintptr_t)&BASS_GetConfigPtr},
 	{ "BASS_GetConfigPtr", (uintptr_t)&BASS_GetConfigPtr},
 	{ "BASS_GetVersion", (uintptr_t)&BASS_GetVersion},
