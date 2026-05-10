@@ -1473,7 +1473,6 @@ typedef struct {
 	char album[128];
 	char fname[256];
 	int duration;
-	void *next;
 } song;
 song *songs = NULL;
 uint8_t songs_scanned[2] = {0, 0};
@@ -1514,24 +1513,111 @@ void populateSongs(const char *dir, const char *album, int id) {
 			sprintf(fname, "%s/%s", dir, g_dir.d_name);
 			populateSongs(fname, g_dir.d_name, id);
 		} else {
-			if (!strcmp(&g_dir.d_name[strlen(g_dir.d_name) - 4], ".ogg") ||
-				!strcmp(&g_dir.d_name[strlen(g_dir.d_name) - 4], ".wav") ||
-				!strcmp(&g_dir.d_name[strlen(g_dir.d_name) - 5], ".flac") ||
-				!strcmp(&g_dir.d_name[strlen(g_dir.d_name) - 4], ".mp3")) {
+			uint32_t len = strlen(g_dir.d_name);
+			if (!strcmp(&g_dir.d_name[len - 4], ".ogg") ||
+				!strcmp(&g_dir.d_name[len - 4], ".wav") ||
+				!strcmp(&g_dir.d_name[len - 5], ".flac") ||
+				!strcmp(&g_dir.d_name[len - 4], ".mp3")) {
 				song *s = &songs[song_idx++];
-				sceClibMemset(s, 0, sizeof(song));
+				s->title[0] = s->artist[0] = s->album[0] = 0;
 				sprintf(s->fname, "%s/%s", dir, g_dir.d_name);
+				int found_tags = 0;
+				if (g_dir.d_name[len - 1] == '3') { // MP3
+					FILE *f = fopen(s->fname, "rb");
+					fseek(f, 10, SEEK_SET);
+					char tag[5];
+					size_t sz;
+					tag[4] = 0;
+					while (found_tags < 3) {
+						fread(tag, 1, 4, f);
+						if (tag[0] < 'A' || tag[0] > 'Z')
+							break;
+						fread(&sz, 4, 1, f);
+						sz = __builtin_bswap32(sz);
+						fseek(f, 3, SEEK_CUR);
+						if (!strcmp(tag, "TIT2")) {
+							fread(s->title, 1, sz - 1, f);
+							s->title[sz] = 0;
+							found_tags++;
+						} else if (!strcmp(tag, "TPE1")) {
+							fread(s->artist, 1, sz - 1, f);
+							s->artist[sz] = 0;
+							found_tags++;
+						} else if (!strcmp(tag, "TALB")) {
+							fread(s->album, 1, sz - 1, f);
+							s->album[sz] = 0;
+							found_tags++;
+						} else {
+							fseek(f, sz - 1, SEEK_CUR);
+						}
+					}
+					fclose(f);
+				} else if (g_dir.d_name[len - 1] == 'g') { // OGG
+					FILE *f = fopen(s->fname, "rb");
+					char comm[512];
+					char hdr[5];
+					hdr[4] = 0;
+					for (;;) {
+						fread(hdr, 1, 4, f);
+						if (strcmp(hdr, "OggS"))
+							break;
+						fseek(f, 22, SEEK_CUR);
+						uint8_t seg_table[128];
+						uint8_t segs_num;
+						size_t sz;
+						fread(&segs_num, 1, 1, f);
+						fread(seg_table, 1, segs_num, f);
+						uint8_t header_type;
+						fread(&header_type, 1, 1, f);
+						if (header_type == 3) {
+							fseek(f, 6, SEEK_CUR);
+							fread(&sz, 1, 4, f);
+							if (sz) {
+								fseek(f, sz, SEEK_CUR);
+							}
+							uint32_t num_comments;
+							fread(&num_comments, 1, 4, f);
+							for (int i = 0; i < num_comments; i++) {
+								fread(&sz, 1, 4, f);
+								fread(comm, 1, sz, f);
+								comm[sz] = 0;
+								if (!strncasecmp(comm, "title=", 6)) {
+									strcpy(s->title, &comm[6]);
+									found_tags++;
+								} else if (!strncasecmp(comm, "artist=", 7)) {
+									strcpy(s->artist, &comm[7]);
+									found_tags++;
+								} else if (!strncasecmp(comm, "album=", 6)) {
+									strcpy(s->album, &comm[6]);
+									found_tags++;
+								}
+								if (found_tags == 3) {
+									break;
+								}
+							}
+							break;
+						} else {
+							sz = 0;
+							for (int i = 0; i < segs_num; i++) {
+								sz += seg_table[i];
+							}
+							fseek(f, sz - 1, SEEK_CUR);
+						}
+					}
+				}
 				s->duration = Song_GetTotalDuration(s->fname) * 1000;
 				sprintf(fname, "%s/%s.txt", dir, g_dir.d_name);
 				load_metadata(fname, s);
-				if (strlen(s->title) < 2) {
+				if (!s->title[0]) {
 					sprintf(s->title, g_dir.d_name);
 					s->title[strlen(s->title) - 4] = 0;
 				}
-				if (id == IMPORTED_SONGS) {
-					strcpy(s->album, "Imported Music");
-				} else {
-					strcpy(s->album, album ? album : "Unknown");
+				if (!s->album[0]) {
+					if (id == IMPORTED_SONGS) {
+						strcpy(s->album, "Imported Music");
+					} else {
+						strcpy(s->album, album ? album : "Unknown");
+					}
 				}
 			}
 		}
