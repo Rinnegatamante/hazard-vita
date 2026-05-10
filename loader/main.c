@@ -1645,6 +1645,7 @@ void populateSongs(const char *dir, const char *album, int id) {
 							fseek(f, sz - 1, SEEK_CUR);
 						}
 					}
+					fclose(f);
 				} else if (g_dir.d_name[len - 1] == 'c') { // FLAC
 					FILE *f = fopen(s->fname, "rb");
 					char comm[512];
@@ -1690,8 +1691,53 @@ void populateSongs(const char *dir, const char *album, int id) {
 							fseek(f, block_len, SEEK_CUR);
 						}
 					}
+					fclose(f);
 				} else if (g_dir.d_name[len - 1] == 'v') { // WAV
-					
+					FILE *f = fopen(s->fname, "rb");
+					fseek(f, 12, SEEK_SET);
+					char comm[512];
+					char hdr[5];
+					hdr[4] = 0;
+					for (;;) {
+						size_t sz;
+						fread(hdr, 1, 4, f);
+						fread(&sz, 1, 4, f);
+						if (!strcmp(hdr, "LIST")) {
+							fread(hdr, 1, 4, f);
+							if (!strcmp(hdr, "INFO")) {
+								sz -= 4;
+								while (sz > 0) {
+									size_t sub_sz;
+									fread(hdr, 1, 4, f);
+									fread(&sub_sz, 1, 4, f);
+									if (!strcmp(hdr, "INAM")) {
+										fread(s->title, 1, sub_sz, f);
+										s->title[sub_sz] = 0;
+									} else if (!strcmp(hdr, "IART")) {
+										fread(s->artist, 1, sub_sz, f);
+										s->artist[sub_sz] = 0;
+									} else if (!strcmp(hdr, "IGNR")) {
+										fread(s->genre, 1, sub_sz, f);
+										s->genre[sub_sz] = 0;
+									} else if (!strcmp(hdr, "IPRD")) {
+										fread(s->album, 1, sub_sz, f);
+										s->album[sub_sz] = 0;
+									} else {
+										fseek(f, sub_sz, SEEK_CUR);
+									}
+									sz -= 8 + sub_sz;
+								}
+								break;
+							} else {
+								fseek(f, (sz & 1) ? (sz - 3) : (sz - 4), SEEK_CUR);
+							}
+						} else if (!strcmp(hdr, "data")) {
+							break;
+						} else {
+							fseek(f, (sz & 1) ? (sz + 1) : sz, SEEK_CUR);
+						}
+					}
+					fclose(f);
 				}
 				s->duration = Song_GetTotalDuration(s->fname) * 1000;
 				sprintf(fname, "%s/%s.txt", dir, g_dir.d_name);
