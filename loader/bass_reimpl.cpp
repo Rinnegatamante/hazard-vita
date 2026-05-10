@@ -212,22 +212,20 @@ uint32_t BASS_ChannelGetData(BASS_internal_sample *handle, void *buffer, uint32_
 	auto *b = (SoLoud::Bus *)handle->handle;
 	switch (length) {
 	case BASS_DATA_FFT2048:
-		//printf("GetData BASS_DATA_FFT2048\n");
 		fft = b->calcFFT();
-		for (int i = 0; i < 256; i++) {
-			fbuffer[i] = fft[i] / 32.0f; // FIXME: Without this normalization, FFT is way higher than expected
+		for (int i = 0; i < 1024; i++) {
+			float idx = i * (256.0f / 1024.0f);
+			int lo = (int)idx;
+			int hi = (lo + 1 < 256) ? lo + 1 : lo;
+			float t = idx - lo;
+			float val = fft[lo] * (1.0f - t) + fft[hi] * t;
+			fbuffer[i] = fminf(val / 256.0f, 1.0f);
 		}
-		sceClibMemcpy(fbuffer + 256, fbuffer, 256 * sizeof(float));
-		//sceClibMemset(fbuffer + 256, 0, 256 * sizeof(float));
-		return 0x800;
+		return 1024 * sizeof(float);
 	default:
-		//printf("GetData %x\n", length);
 		fft = b->getWave();
 		sceClibMemcpy(fbuffer, fft, 256 * sizeof(float));
-		sceClibMemcpy(fbuffer + 256, fft, 256 * sizeof(float));
-		sceClibMemcpy(fbuffer + 512, fbuffer, 512 * sizeof(float));
-		sceClibMemcpy(fbuffer + 1024, fbuffer, 1024 * sizeof(float));
-		return 0x2000;
+		return 256 * sizeof(float);
 	}
 	return -1;
 }
