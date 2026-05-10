@@ -64,6 +64,24 @@ static char fake_env[0x1000];
 
 int framecap = 0;
 
+enum {
+	DATA_SONGS,
+	IMPORTED_SONGS
+};
+
+typedef struct {
+	char title[128];
+	char artist[128];
+	char album[128];
+	char fname[256];
+	char genre[128];
+	int duration;
+} song;
+song *songs = NULL;
+uint8_t songs_scanned[2] = {0, 0};
+int song_idx = 0;
+int songs_num = 0;
+
 int file_exists(const char *path) {
 	SceIoStat stat;
 	return sceIoGetstat(path, &stat) >= 0;
@@ -423,6 +441,25 @@ int showWebPage(void *this, char *url) {
 	return 0;
 }
 
+void (*setGenre)(void *this, const char *genre);
+
+so_hook addlocalfile_hook;
+int addLocalFile(void *this, int unk, void *tags, char *wpath, char unk2, int unk3) {
+	if (songs_num) {
+		char fname[256];
+		wcstombs(fname, wpath, sizeof(fname));
+	
+		for (int i = 0; i < songs_num; i++) {
+			if (!strcmp(fname, songs[i].fname)) {
+				setGenre(tags, songs[i].genre);
+				break;
+			}
+		}
+	}
+
+	return SO_CONTINUE(int, addlocalfile_hook, this, unk, tags, wpath, unk2, unk3);
+}
+
 void patch_game(void) {
 	char *androidProvider = (char *)so_symbol(&hazard_mod, "androidProvider");
 	if (androidProvider)
@@ -434,6 +471,10 @@ void patch_game(void) {
 
 	//hook_addr(so_symbol(&hazard_mod, "_ZN9CdebugMsg7printffE9EdebugMsgPKcz"), (uintptr_t)&debugMsg);
 	hook_addr(so_symbol(&hazard_mod, "_ZN16CplatformAndroid31httpPost_postToGoogleAnalyiticsEPNSt6__ndk112basic_stringIcNS0_11char_traitsIcEENS0_9allocatorIcEEEE"), (uintptr_t)&ret0);
+	
+	// Implement Genre handling for custom songs
+	setGenre = so_symbol(&hazard_mod, "_ZN9CaudioTag8setGenreEPKc");
+	addlocalfile_hook = hook_addr(so_symbol(&hazard_mod, "_ZN8CsongMgr12addLocalFileE13EsongPackTypeP9CaudioTagPwbb"), (uintptr_t)&addLocalFile);
 }
 
 extern void *__aeabi_atexit;
@@ -1352,7 +1393,7 @@ static NameToMethodID name_to_method_ids[] = {
 };
 
 int GetMethodID(void *env, void *class, const char *name, const char *sig) {
-	printf("GetMethodID: %s\n", name);
+	sceClibPrintf("GetMethodID: %s\n", name);
 
 	for (int i = 0; i < sizeof(name_to_method_ids) / sizeof(NameToMethodID); i++) {
 		if (strcmp(name, name_to_method_ids[i].name) == 0) {
@@ -1364,7 +1405,7 @@ int GetMethodID(void *env, void *class, const char *name, const char *sig) {
 }
 
 int GetStaticMethodID(void *env, void *class, const char *name, const char *sig) {
-	printf("GetStaticMethodID: %s\n", name);
+	sceClibPrintf("GetStaticMethodID: %s\n", name);
 	
 	for (int i = 0; i < sizeof(name_to_method_ids) / sizeof(NameToMethodID); i++) {
 		if (strcmp(name, name_to_method_ids[i].name) == 0)
@@ -1462,23 +1503,6 @@ int CallBooleanMethodV(void *env, void *obj, int methodID, uintptr_t *args) {
 	}
 }
 
-enum {
-	DATA_SONGS,
-	IMPORTED_SONGS
-};
-
-typedef struct {
-	char title[128];
-	char artist[128];
-	char album[128];
-	char fname[256];
-	int duration;
-} song;
-song *songs = NULL;
-uint8_t songs_scanned[2] = {0, 0};
-int song_idx = 0;
-int songs_num = 0;
-
 void load_metadata(const char *fname, song *s) {
 	char buffer[256];
 	char identifier[64];
@@ -1519,7 +1543,7 @@ void populateSongs(const char *dir, const char *album, int id) {
 				!strcmp(&g_dir.d_name[len - 5], ".flac") ||
 				!strcmp(&g_dir.d_name[len - 4], ".mp3")) {
 				song *s = &songs[song_idx++];
-				s->title[0] = s->artist[0] = s->album[0] = 0;
+				s->title[0] = s->artist[0] = s->album[0] = s->genre[0] = 0;
 				sprintf(s->fname, "%s/%s", dir, g_dir.d_name);
 				int found_tags = 0;
 				if (g_dir.d_name[len - 1] == '3') { // MP3
@@ -1528,7 +1552,7 @@ void populateSongs(const char *dir, const char *album, int id) {
 					char tag[5];
 					size_t sz;
 					tag[4] = 0;
-					while (found_tags < 3) {
+					while (found_tags < 4) {
 						fread(tag, 1, 4, f);
 						if (tag[0] < 'A' || tag[0] > 'Z')
 							break;
@@ -1547,6 +1571,10 @@ void populateSongs(const char *dir, const char *album, int id) {
 							fread(s->album, 1, sz - 1, f);
 							s->album[sz] = 0;
 							found_tags++;
+						} else if (!strcmp(tag, "TCON")) {
+							fread(s->genre, 1, sz - 1, f);
+							s->genre[sz] = 0;
+							found_tags++;	
 						} else {
 							fseek(f, sz - 1, SEEK_CUR);
 						}
@@ -1590,8 +1618,11 @@ void populateSongs(const char *dir, const char *album, int id) {
 								} else if (!strncasecmp(comm, "album=", 6)) {
 									strcpy(s->album, &comm[6]);
 									found_tags++;
+								} else if (!strncasecmp(comm, "genre=", 6)) {
+									strcpy(s->genre, &comm[6]);
+									found_tags++;
 								}
-								if (found_tags == 3) {
+								if (found_tags == 4) {
 									break;
 								}
 							}
@@ -1602,6 +1633,51 @@ void populateSongs(const char *dir, const char *album, int id) {
 								sz += seg_table[i];
 							}
 							fseek(f, sz - 1, SEEK_CUR);
+						}
+					}
+				} else if (g_dir.d_name[len - 1] == 'c') { // FLAC
+					FILE *f = fopen(s->fname, "rb");
+					char comm[512];
+					char hdr[5];
+					hdr[4] = 0;
+					fseek(f, 4, SEEK_SET);
+					for (;;) {
+						fread(hdr, 1, 4, f);
+						int block_type = hdr[0] & 0x7F;
+						int is_last_block = (hdr[0] & 0x80) != 0;
+						size_t block_len = ((size_t)hdr[1] << 16) | ((size_t)hdr[2] << 8) | hdr[3];
+						if (block_type == 4) {
+							size_t sz;
+							fread(&sz, 1, 4, f);
+							fseek(f, sz, SEEK_CUR);
+							uint32_t num_comments;
+							fread(&num_comments, 1, 4, f);
+							for (int i = 0; i < num_comments; i++) {
+								fread(&sz, 1, 4, f);
+								fread(comm, 1, sz, f);
+								comm[sz] = 0;
+								if (!strncasecmp(comm, "title=", 6)) {
+									strcpy(s->title, &comm[6]);
+									found_tags++;
+								} else if (!strncasecmp(comm, "artist=", 7)) {
+									strcpy(s->artist, &comm[7]);
+									found_tags++;
+								} else if (!strncasecmp(comm, "album=", 6)) {
+									strcpy(s->album, &comm[6]);
+									found_tags++;
+								} else if (!strncasecmp(comm, "genre=", 6)) {
+									strcpy(s->genre, &comm[6]);
+									found_tags++;
+								}
+								if (found_tags == 4) {
+									break;
+								}
+							}
+							break;
+						} else if (is_last_block) {
+							break;
+						} else {
+							fseek(f, block_len, SEEK_CUR);
 						}
 					}
 				}
@@ -1618,6 +1694,9 @@ void populateSongs(const char *dir, const char *album, int id) {
 					} else {
 						strcpy(s->album, album ? album : "Unknown");
 					}
+				}
+				if (!s->genre[0]) {
+					strcpy(s->genre, "Unknown");
 				}
 			}
 		}
