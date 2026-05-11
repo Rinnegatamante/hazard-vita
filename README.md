@@ -9,6 +9,16 @@ By doing so, it's basically as if we emulate a minimalist Android environment in
 
 ## Changelog
 
+### v1.1
+
+- Added support for imported musics in ux0:music.
+- Added Genre metadata support for custom songs.
+- Added possibility to customize album and genre metadata from the auxiliary txt metadata file.
+- Added support for metadata extraction for the song files themselves. (These can be overloaded with the auxiliary txt metadata file)
+- Improved the FFT and wavelength calculations for songs: this will result in a much more accurate visual pattern and better enemies spawns timed with music beats.
+- Updated to latest vitaGL commit.
+- Optimized rendering logic by removing temporary memory allocations for oneshot vbos.
+
 ### v1.0
 
 - Initial Release.
@@ -35,15 +45,18 @@ By doing so, it's basically as if we emulate a minimalist Android environment in
 ## How to use custom songs
 
 Beat Hazard 2 features support for custom songs. On the Vita port, songs in `.wav`, `.mp3`, `.flac` and `.ogg` formats are supported.
+All songs available in the official Music player will be available in the game.
 
 Songs must be placed in `ux0:data/hazard/songs` and an additional metadata file can be added named as `filename_of_the_song.format.txt`. In this file, two parameters can be written:
 ```
 artist=Name of the artist
 title=Name of the song
+albume=Name of the album
+genre=Name of the genre of the song
 ```
 Those will define respectively what the game will use as Artist name and Song Title. If this file is not provided, Artist will be set as `Unknown` and Song Title will be set to the name of the song file stripped from its format.
 
-In order to categorize songs by Albums, you can create subfolders inside the `songs` folder with the name of the album in question and place inside that the songs of said album.
+In order to categorize songs by Albums without a metadata txt file or metadata in the song itself, you can create subfolders inside the `songs` folder with the name of the album in question and place inside that the songs of said album.
 Here is a practical example:
 <img src="./custom_songs.png">
 In this example, the song in question will be shown in the game as:<br>
@@ -81,7 +94,7 @@ Additionally, you'll need these libraries to be compiled as well with `-mfloat-a
 - [vitaGL](https://github.com/Rinnegatamante/vitaGL)
 
   - ````bash
-    make SOFTFP_ABI=1 NO_DEBUG=1 install
+    make SOFTFP_ABI=1 NO_DEBUG=1 USE_SCRATCH_MEMORY=1 install
     ````
 
 After all these requirements are met, you can compile the loader with the following commands:
