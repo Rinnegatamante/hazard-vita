@@ -26,6 +26,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <pthread.h>
 #include <wchar.h>
 #include <wctype.h>
@@ -444,7 +445,7 @@ int showWebPage(void *this, char *url) {
 void (*setGenre)(void *this, const char *genre);
 
 so_hook addlocalfile_hook;
-int addLocalFile(void *this, int unk, void *tags, char *wpath, char unk2, int unk3) {
+int addLocalFile(void *this, int unk, void *tags, wchar_t *wpath, char unk2, int unk3) {
 	if (songs_num) {
 		char fname[256];
 		wcstombs(fname, wpath, sizeof(fname));
@@ -473,7 +474,7 @@ void patch_game(void) {
 	hook_addr(so_symbol(&hazard_mod, "_ZN16CplatformAndroid31httpPost_postToGoogleAnalyiticsEPNSt6__ndk112basic_stringIcNS0_11char_traitsIcEENS0_9allocatorIcEEEE"), (uintptr_t)&ret0);
 	
 	// Implement Genre handling for custom songs
-	setGenre = so_symbol(&hazard_mod, "_ZN9CaudioTag8setGenreEPKc");
+	setGenre = (void (*)(void *, const char *))so_symbol(&hazard_mod, "_ZN9CaudioTag8setGenreEPKc");
 	addlocalfile_hook = hook_addr(so_symbol(&hazard_mod, "_ZN8CsongMgr12addLocalFileE13EsongPackTypeP9CaudioTagPwbb"), (uintptr_t)&addLocalFile);
 }
 
@@ -493,7 +494,6 @@ extern void *__cxa_finalize;
 extern void *__cxa_call_unexpected;
 extern void *__gnu_unwind_frame;
 extern void *__stack_chk_fail;
-int open(const char *pathname, int flags);
 
 static int __stack_chk_guard_fake = 0x42424242;
 
